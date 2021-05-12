@@ -2,16 +2,24 @@
 # Imports
 #----------------------------------------------------------------------------#
 
+from datetime import timezone
 import json
+from os import abort
+import sys
 import dateutil.parser
 import babel
 from flask import Flask, render_template, request, Response, flash, redirect, url_for
+import flask
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 import logging
-from logging import Formatter, FileHandler
+from logging import Formatter, FileHandler, error
 from flask_wtf import Form
+from sqlalchemy.orm import backref, relationship
+from sqlalchemy.sql.expression import true
+from sqlalchemy.sql.schema import ForeignKey, PrimaryKeyConstraint
 from forms import *
+from flask_migrate import Migrate, migrate
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -22,11 +30,14 @@ app.config.from_object('config')
 db = SQLAlchemy(app)
 
 # TODO: connect to a local postgresql database
+migrate = Migrate(app, db)
+
 
 #----------------------------------------------------------------------------#
 # Models.
 #----------------------------------------------------------------------------#
 
+# id ,name ,city ,state ,address ,phone ,image_link ,facebook_link
 class Venue(db.Model):
     __tablename__ = 'Venue'
 
@@ -40,7 +51,15 @@ class Venue(db.Model):
     facebook_link = db.Column(db.String(120))
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    seeking_talent = db.Column(db.Boolean, nullable=False, default=0)
+    genres = db.Column(db.ARRAY(db.String()), nullable=False)
+    seeking_description = db.Column(db.String(500),nullable=False)
+    show = db.relationship('Show', backref='venue', lazy=True, cascade="all, delete")
+    def __repr__(self):
+      return f'Venue<id: {self.id},name: {self.name},city: {self.city},state: {self.state},'+\
+        f'address: {self.address},phone: {self.phone},image_link: {self.image_link},facebook_link: {self.facebook_link}>'
 
+# # id,name,city,state,phone,genres,image_link,facebook_link
 class Artist(db.Model):
     __tablename__ = 'Artist'
 
@@ -49,17 +68,39 @@ class Artist(db.Model):
     city = db.Column(db.String(120))
     state = db.Column(db.String(120))
     phone = db.Column(db.String(120))
-    genres = db.Column(db.String(120))
+    # genres = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    seeking_venue = db.Column(db.Boolean, nullable=False, default=0)
+    genres = db.Column(db.ARRAY(db.String()), nullable=False)
+    seeking_description = db.Column(db.String(500), nullable=False)
+    
+    show = db.relationship('Show', backref='artist', lazy=True, cascade="all, delete")
+    def __repr__(self):
+      return f'Artist<id = {self.id},name = {self.name},city = {self.city}\
+        ,state = {self.state},phon = {self.phone},genres = {self.genres},image_link = {self.image_link}\
+        ,facebook_link = {self.facebook_link}>'
 
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
+class Show(db.Model):
+  __tablename__ = 'Shows'
 
+  id = db.Column(db.Integer, primary_key=True)
+  artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)
+  venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
+  start_time = db.Column(db.String, nullable=False)
+
+  def __repr__(self):
+      return f'Shows<id:{self.id}, artist_id: {self.artist_id}, venue_id: {self.venue_id}, start_time: {self.start_time}>'
 #----------------------------------------------------------------------------#
 # Filters.
 #----------------------------------------------------------------------------#
+# # id,name,city,state,phone,genres,image_link,facebook_link
+# ar1 = Artist(1, 'ar1', 'ch', 'poni',7845, 'song', 'img', 'fb' )
+# db.session.add(ar1)
+# db.session.commit(ar1)
 
 def format_datetime(value, format='medium'):
   date = dateutil.parser.parse(value)
@@ -108,7 +149,35 @@ def venues():
       "num_upcoming_shows": 0,
     }]
   }]
-  return render_template('pages/venues.html', areas=data);
+  
+  data = []
+  
+  citi_state_list = db.session.query(Venue.city, Venue.state).distinct().all()
+  for city, state in citi_state_list:
+    obj = {}
+    venues = []
+
+    obj['city'] = city
+    obj['state'] = state
+
+    for ven in Venue.query.filter(Venue.city == city).all():
+      venue_obj = {}
+      venue_obj['id'] = ven.id
+      venue_obj['name'] = ven.name
+      venues.append(venue_obj)
+      upcoming_shows = Show.query.filter(Show.venue_id == ven.id\
+                    ,Show.start_time >= str(datetime.today())).all() 
+
+      venue_obj['num_upcoming_shows'] = len(upcoming_shows)
+    
+    obj['venues'] = venues  
+    
+    data.append(obj)
+
+
+  
+  # data = Venue.query.all()
+  return  render_template('pages/venues.html', areas=data)
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -123,6 +192,24 @@ def search_venues():
       "num_upcoming_shows": 0,
     }]
   }
+    # Artist.query.filter(Artist.name.like('%Que%')).all()
+  search_term = request.form.get('search_term', '')
+  response = {}
+  data = []
+  venues = Venue.query.filter(Venue.name.like(f'%{search_term}%')).all()
+  for venue in venues:
+    obj = {}
+    num_upcoming_shows = len(Show.query.filter(Show.venue_id == venue.id\
+                            , Show.start_time > str(datetime.today())\
+                            ).all())
+    obj['id'] = venue.id
+    obj['name'] = venue.name
+    obj['num_upcoming_shows'] = num_upcoming_shows
+    data.append(obj)
+  
+  response['count'] = len(venues)
+  response['data'] = data
+
   return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
 @app.route('/venues/<int:venue_id>')
@@ -206,7 +293,30 @@ def show_venue(venue_id):
     "past_shows_count": 1,
     "upcoming_shows_count": 1,
   }
-  data = list(filter(lambda d: d['id'] == venue_id, [data1, data2, data3]))[0]
+  today = str(datetime.today())
+  venue = Venue.query.get(venue_id)
+  # shows = artist.show
+  upcoming_shows = Show.query.filter(Show.venue_id == venue_id\
+                    ,Show.start_time >= today).all() 
+  past_shows = Show.query.  filter(Show.venue_id == venue_id\
+                ,Show.start_time < today).all()
+  
+  # genres =  ''.join(venue.genres)
+  data = {}
+  data["id"] = venue.id
+  data["name"] = venue.name
+  data["genres"] = venue.genres
+  data["city"] = venue.city
+  data["state"] =venue.state
+  data["phone"] = venue.phone
+  data["seeking_talent"] =venue.seeking_talent
+  data["image_link"] = venue.image_link
+  data["upcoming_shows"] = upcoming_shows
+  data["past_shows"] = past_shows
+  
+  
+  # query = Venue.query.filter(Venue.id == venue_id)
+  # data = query.first()
   return render_template('pages/show_venue.html', venue=data)
 
 #  Create Venue
@@ -221,9 +331,39 @@ def create_venue_form():
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
+  error = False
+  try:
+    name  = request.form.get('name')
+    city  = request.form.get('city')
+    state  = request.form.get('state')
+    address  = request.form.get('address')
+    phone  = request.form.get('phone')
+    image_link  = request.form.get('image_link')
+    facebook_link = request.form.get('facebook_link')
+    seeking_talent = int(bool(request.form.get('seeking_talent')))
+    genres = request.form.getlist('genres')
+    
+    seeking_description = request.form.get('seeking_description')
 
+    venue = Venue(name=name ,city=city ,state=state ,address=address ,phone=phone \
+      ,image_link =image_link,facebook_link=facebook_link \
+      ,seeking_talent=seeking_talent, genres=genres, seeking_description=seeking_description)
+    db.session.add(venue)
+    db.session.commit()
+    print('----------ADD VENUE: Success-----------')
+
+  except:
+    error = True
+    db.session.rollback()
+    print(sys.exc_info())
+  
+  finally:
+    db.session.close()
+    if error:
+      print('-------- ADD Venue: Fail --------')
+      flash('An error occurred. Venue ' + name + ' could not be listed.')
   # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
+    flash('Venue ' + name + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
@@ -253,6 +393,15 @@ def artists():
     "id": 6,
     "name": "The Wild Sax Band",
   }]
+  # data = Artist.query.all()
+  data = []
+  query = db.session.query(Artist.id, Artist.name).all()
+
+  for val in query:
+    temp = {}
+    temp['id'] = val.id
+    temp['name'] = val.name
+    data.append(temp)
   return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
@@ -268,6 +417,23 @@ def search_artists():
       "num_upcoming_shows": 0,
     }]
   }
+  search_term = request.form.get('search_term', '')
+  response = {}
+  data = []
+  artists = Artist.query.filter(Artist.name.like(f'%{search_term}%')).all()
+  for artist in artists:
+    obj = {}
+    num_upcoming_shows = len(Show.query.filter(Show.artist_id == artist.id\
+                            , Show.start_time > str(datetime.today())\
+                            ).all())
+    obj['id'] = artist.id
+    obj['name'] = artist.name
+    obj['num_upcoming_shows'] = num_upcoming_shows
+    data.append(obj)
+  
+  response['count'] = len(artists)
+  response['data'] = data
+
   return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
 
 @app.route('/artists/<int:artist_id>')
@@ -345,7 +511,31 @@ def show_artist(artist_id):
     "past_shows_count": 0,
     "upcoming_shows_count": 3,
   }
-  data = list(filter(lambda d: d['id'] == artist_id, [data1, data2, data3]))[0]
+  today = str(datetime.today())
+  artist = Artist.query.get(artist_id)
+  # shows = artist.show
+  upcoming_shows = Show.query.filter(Show.artist_id == artist_id\
+                    ,Show.start_time >= today).all() 
+  past_shows = Show.query.filter(Show.artist_id == artist_id\
+                ,Show.start_time < today).all()
+  
+  data = {}
+  data["id"] = artist.id
+  data["name"] = artist.name
+
+  genres =  ''.join(artist.genres)
+  # data["genres"] = genres
+  data["genres"] = artist.genres
+
+  data["city"] = artist.city
+  data["state"] = artist.state
+  data["phone"] = artist.phone
+  data["seeking_venue"] = artist.seeking_venue
+  data["image_link"] = artist.image_link
+  data["upcoming_shows"] = upcoming_shows
+  data["past_shows"] = past_shows
+  
+  
   return render_template('pages/show_artist.html', artist=data)
 
 #  Update
@@ -362,17 +552,59 @@ def edit_artist(artist_id):
     "phone": "326-123-5000",
     "website": "https://www.gunsnpetalsband.com",
     "facebook_link": "https://www.facebook.com/GunsNPetals",
-    "seeking_venue": True,
+    "seeking_venue": True,  
     "seeking_description": "Looking for shows to perform at in the San Francisco Bay Area!",
     "image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80"
   }
   # TODO: populate form with fields from artist with ID <artist_id>
+  artist = Artist.query.get(artist_id)
+  form.name.data = artist.name
+  form.city.data = artist.city
+  form.state.data = artist.state
+  form.phone.data = artist.phone
+  form.genres.data = artist.genres
+  form.image_link.data = artist.image_link
+  form.facebook_link.data = artist.facebook_link
+  form.seeking_venue.data = artist.seeking_venue
+  form.seeking_description.data = artist.seeking_description
+  
   return render_template('forms/edit_artist.html', form=form, artist=artist)
 
 @app.route('/artists/<int:artist_id>/edit', methods=['POST'])
 def edit_artist_submission(artist_id):
   # TODO: take values from the form submitted, and update existing
   # artist record with ID <artist_id> using the new attributes
+  error = False
+  try:
+    artist = Artist.query.get(artist_id)
+    artist.name  = request.form.get('name')
+    artist.city  = request.form.get('city')
+    artist.state  = request.form.get('state')
+    artist.address  = request.form.get('address')
+    artist.phone  = request.form.get('phone')
+    artist.image_link  = request.form.get('image_link')
+    artist.facebook_link = request.form.get('facebook_link')
+    artist.seeking_talent = int(bool(request.form.get('seeking_talent')))
+    artist.genres = request.form.getlist('genres')
+    
+    artist.seeking_description = request.form.get('seeking_description')
+
+    db.session.add(artist)
+    db.session.commit()
+    print('----------EDIT Artist: Success-----------')
+
+  except:
+    error = True
+    db.session.rollback()
+    print(sys.exc_info())
+  
+  finally:
+    db.session.close()
+    if error:
+      print('-------- EDIT Artist: Fail --------')
+      flash('An error occurred. Artist could not be edited.')
+  # on successful db insert, flash success
+    flash('Artist was successfully edited!')
 
   return redirect(url_for('show_artist', artist_id=artist_id))
 
@@ -394,12 +626,55 @@ def edit_venue(venue_id):
     "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60"
   }
   # TODO: populate form with values from venue with ID <venue_id>
+  venue = Venue.query.get(venue_id)
+  form.name.data = venue.name
+  form.city.data = venue.city
+  form.state.data = venue.state
+  form.phone.data = venue.phone
+  form.genres.data = venue.genres
+  form.address.data = venue.address
+  form.image_link.data = venue.image_link
+  form.facebook_link.data = venue.facebook_link
+  form.seeking_talent.data = venue.seeking_talent
+  form.seeking_description.data = venue.seeking_description
+   
   return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
   # TODO: take values from the form submitted, and update existing
   # venue record with ID <venue_id> using the new attributes
+  error = False
+  try:
+    venue = Venue.query.get(venue_id)
+    venue.name  = request.form.get('name')
+    venue.city  = request.form.get('city')
+    venue.state  = request.form.get('state')
+    venue.address  = request.form.get('address')
+    venue.phone  = request.form.get('phone')
+    venue.image_link  = request.form.get('image_link')
+    venue.facebook_link = request.form.get('facebook_link')
+    venue.seeking_talent = int(bool(request.form.get('seeking_talent')))
+    venue.genres = request.form.getlist('genres')
+    
+    venue.seeking_description = request.form.get('seeking_description')
+
+    db.session.add(venue)
+    db.session.commit()
+    print('----------EDIT Venue: Success-----------')
+
+  except:
+    error = True
+    db.session.rollback()
+    print(sys.exc_info())
+  
+  finally:
+    db.session.close()
+    if error:
+      print('-------- EDIT Venue: Fail --------')
+      flash('An error occurred. Venue could not be edited.')
+  # on successful db insert, flash success
+    flash('Venue was successfully edited!')
   return redirect(url_for('show_venue', venue_id=venue_id))
 
 #  Create Artist
@@ -410,14 +685,46 @@ def create_artist_form():
   form = ArtistForm()
   return render_template('forms/new_artist.html', form=form)
 
+
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
   # called upon submitting the new artist listing form
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
+  error = False
+  try:
+    name = request.form.get('name')
+    city = request.form.get('city')
+    state = request.form.get('state')
+    phone = request.form.get('phone')
+    genres = request.form.getlist('genres')
+    image_link = request.form.get('image_link')
+    facebook_link = request.form.get('facebook_link')
+    seeking_venue = int(bool(request.form.get('seeking_venue')))
+    seeking_description = request.form.get('seeking_description')
+    
+    artist = Artist(name=name, city=city, state=state, phone=phone,\
+      genres=genres, image_link=image_link, facebook_link=facebook_link \
+      ,seeking_venue=seeking_venue \
+      ,seeking_description=seeking_description)
+    
+    db.session.add(artist)
+    db.session.commit()
 
-  # on successful db insert, flash success
-  flash('Artist ' + request.form['name'] + ' was successfully listed!')
+  except:
+    error = True  
+    db.session.rollback()
+    print(sys.exc_info())
+
+  finally:
+    db.session.close()
+    if error: 
+      flash('self defined error ' + name + ' could not be listed.')
+      abort(400)
+    else:
+      # on successful db insert, flash success
+      flash('Artist ' + name+ ' was successfully listed!')  
+
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
   return render_template('pages/home.html')
@@ -467,6 +774,19 @@ def shows():
     "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
     "start_time": "2035-04-15T20:00:00.000Z"
   }]
+
+  data = []
+
+  query = Show.query.all()
+  for q in query:
+    obj = {}
+    obj['venue_id'] = q.venue_id
+    obj['venue_name'] = q.venue.name
+    obj['artist_id'] = q.artist.id
+    obj['artist_name'] = q.artist.name
+    obj['artist_image_link'] = q.artist.image_link
+    obj['start_time'] = q.start_time
+    data.append(obj)
   return render_template('pages/shows.html', shows=data)
 
 @app.route('/shows/create')
@@ -479,9 +799,30 @@ def create_shows():
 def create_show_submission():
   # called to create new shows in the db, upon submitting new show listing form
   # TODO: insert form data as a new Show record in the db, instead
+  error = False
+  try:
+    artist_id = request.form.get('artist_id')
+    venue_id = request.form.get('venue_id')
+    start_time = request.form.get('start_time')
 
-  # on successful db insert, flash success
-  flash('Show was successfully listed!')
+    show = Show(artist_id=artist_id, venue_id=venue_id, start_time=start_time)
+
+    db.session.add(show)
+    db.session.commit()
+  
+  except:
+    error = True
+    db.session.rollback()
+    print(sys.exc_info())
+  
+  finally:
+    db.session.close()
+    if error:
+      flash('An error occurred. Show could not be listed.')
+      abort(400)
+    else:
+      # on successful db insert, flash success
+      flash('Show was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
