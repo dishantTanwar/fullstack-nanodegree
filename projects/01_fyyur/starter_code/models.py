@@ -63,5 +63,3 @@ class Show(db.Model):
 
   def __repr__(self):
       return f'Shows<id:{self.id}, artist_id: {self.artist_id}, venue_id: {self.venue_id}, start_time: {self.start_time}>'
-
-print("OKAY")
