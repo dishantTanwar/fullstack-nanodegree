@@ -50,3 +50,18 @@ By making notes ahead of time, you will practice the core skill of being able to
 
 
 >View the [README within ./frontend for more details.](./frontend/README.md)
+
+### Getting Setup
+1. Installing Dependencies
+2 . Installing Node and NPM
+
+This project depends on Nodejs and Node Package Manager (NPM). Before continuing, you must download and install Node (the download includes NPM) from [here](https://nodejs.com/en/download).
+
+#### Installing project dependencies
+This project uses NPM to manage software dependencies. NPM Relies on the package.json file located in the frontend directory of this repository. After cloning, open your terminal and run:
+
+> npm install
+> tip: npm i is shorthand for npm install
+
+### Documentation Link
+[Backend](./backend/README.md)
