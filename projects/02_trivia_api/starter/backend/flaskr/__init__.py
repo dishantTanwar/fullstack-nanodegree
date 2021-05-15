@@ -5,7 +5,7 @@ from sqlalchemy.sql.sqltypes import JSON
 from flask_cors import CORS, cross_origin
 import sys
 import random
-
+from math import ceil
 
 # import os,sys,inspect
 sys.path.insert(0, '..')
@@ -26,7 +26,7 @@ def get_categories_dict():
   return categories
 
 """"""""""""""""""""""""""""""""""" 
-Flask APP
+ Flask APP
 """""""""""""""""""""""""""""""""""
 def create_app(test_config=None):
 
@@ -68,36 +68,16 @@ def create_app(test_config=None):
     }
     """
     response = {
+      'success' : True,
       'categories': get_categories_dict()
     }
 
     return jsonify(response)
 
-  # get paginated questions 
-  @app.route('/questions', methods = ['GET'])
-  @cross_origin()
-  def show_questions_home():
-    """
-      respods with page 1 data
-    """
-    # Paginate Questions in a set of 10
-    pagination_obj = Question.query.order_by(Question.id).paginate(page=1, per_page=QUESTIONS_PER_PAGE)
-    questions = []
-    for question in pagination_obj.items:
-      questions.append(question.format())
-
-    # get category dict
-    response = {
-        'questions': questions,
-        'total_questions': len(Question.query.all()),
-        'categories': get_categories_dict(),
-        'current_category': 'History'
-    }
-    return jsonify(response)  
 
   # an endpoint to paginated set of questions
-  @app.route('/questions?page=<int:page>', methods = ['GET'])
-  def show_questions(page):
+  @app.route('/questions', methods = ['GET'])
+  def show_questions():
     """
       GET '/questions?page=${integer}'
     - Fetches a paginated set of questions, a total number of questions, all categories and current category string. 
@@ -124,20 +104,27 @@ def create_app(test_config=None):
         'currentCategory': 'History'
       }
     """
-    # Paginate Questions in a set of 10
-    pagination_obj = Question.query.order_by(Question.id) \
-                    .paginate(page=page, per_page=QUESTIONS_PER_PAGE)
-    questions = []
-    for question in pagination_obj.items:
-      questions.append(question.format())
-    
-    response = {
-        'questions': questions,
-        'total_questions': len(Question.query.all()),
-        'categories': get_categories_dict(),
-        'current_category': 'History'
-    }
-    return jsonify(response)
+    page = int(request.args.get('page', default=1))
+    max_page_nums = ceil(len(Question.query.all()) / QUESTIONS_PER_PAGE)
+    if page <= 0 or page >= max_page_nums:
+      abort(400)
+    else: 
+      # Paginate Questions in a set of 10
+      pagination_obj = Question.query.order_by(Question.id) \
+                      .paginate(page=page, per_page=QUESTIONS_PER_PAGE)
+      questions = []
+      for question in pagination_obj.items:
+        questions.append(question.format())
+      
+      response = {
+          'success' : True,
+          'questions': questions,
+          'total_questions': len(Question.query.all()),
+          'categories': get_categories_dict(),
+          'current_category': 'History'
+      }
+
+      return jsonify(response)
 
   
   # an endpoint to DELETE question using a question ID. 
@@ -152,7 +139,8 @@ def create_app(test_config=None):
         you can have it remove the question using the id instead of refetching the questions. 
     
     """
-    question = Question.query.get(question_id)
+    question = Question.query.get_or_404(question_id,{'message' : f'Cannot find Question wihd id = {question_id}'} )
+
     
     try:
       question.delete()
@@ -161,27 +149,22 @@ def create_app(test_config=None):
       })
 
     except:
-      print('---------- DELETE (question): Failed---------')
       db.session.rollback()
       print('Error', sys.exc_info())
-      abort(404)
+      abort(404, {'message' : 'question deletion failed'})
 
     finally:
       db.session.close()
-      print('---------- DELETE (question): Success---------')
 
 
-  # an endpoint to POST a new question, 
+  # an endpoint to POST a new question or query questions with search_term 
   @app.route('/questions', methods = ['POST'])
   def create_or_search_question():
+    
     error = False
+    body = request.get_json()
 
-    request_data = request.get_json()
-    print('-------------------------------')
-    print(request_data)
-    print('-------------------------------')
-
-    search_term = request_data.get('searchTerm', None)
+    search_term = body.get('searchTerm', None)
     if search_term:
       """
         POST '/questions'
@@ -216,6 +199,7 @@ def create_app(test_config=None):
         questions.append(question.format())
       
       response = {
+        'success' : True,
         'questions': questions,
         'total_questions': len(Question.query.all()),
         'current_category': 'Entertainment'
@@ -236,26 +220,44 @@ def create_app(test_config=None):
         }
         - Returns: Does not return any new data
       """
-      try:
-        question = Question(
-        question = request_data.get('question', None),
-        answer = request_data.get('answer', None),
-        difficulty = request_data.get('difficulty', None),
-        category = request_data.get('category', None)
-        )
+      # Add new question to database
+      question   =  body.get('question', None),
+      answer     =  body.get('answer', None),
+      difficulty =  body.get('difficulty', None),
+      category   =  body.get('category', None)
 
-        question.insert()
-        print('---------- ADD (question): Success---------')
+      if not question:
+        abort(400, {'message': 'Question not found in request'})
+
+      if not answer:
+        abort(400, {'message': 'Answer not found in request'})
+
+      if not category:
+        abort(400, {'message': 'Category not found in request'})
+
+      if not difficulty:
+        abort(400, {'message': 'Difficulty not found in request'})
+      
+      try:
+        # Initialize Question Model
+        new_question = Question(
+          question =question,
+          answer =answer,
+          difficulty =difficulty,
+          category =category
+        )
+        
+        # add to database
+        new_question.insert()
         return jsonify({
           "success" : True
         })
       
       except:
         error = True
-        print('---------- ADD (question): Failed---------')
         db.session.rollback()
         print('Error', sys.exc_info())
-        abort(500)
+        abort(500, {'message' : 'had to rollback database'})
       
       finally:
         db.session.close()
@@ -291,6 +293,7 @@ def create_app(test_config=None):
       questions.append(question.format())
     
     response = {
+        'success' : True,
         'questions': questions,
         'total_questions': len(Question.query.all()),
         'current_category': 'History'
@@ -335,6 +338,7 @@ def create_app(test_config=None):
                   .first()
 
     response = {
+      # 'success' : True,
       'question': question.format()
     }
     return jsonify(response)
