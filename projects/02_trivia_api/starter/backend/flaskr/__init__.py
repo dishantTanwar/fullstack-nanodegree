@@ -338,7 +338,7 @@ def create_app(test_config=None):
                   .first()
 
     response = {
-      # 'success' : True,
+      'success' : True,
       'question': question.format()
     }
     return jsonify(response)

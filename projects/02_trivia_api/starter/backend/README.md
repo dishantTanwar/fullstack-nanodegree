@@ -109,11 +109,22 @@ $ pip install -r requirements.txt
 ```
 
 4. Start your postgres server and load the provided database.
+- Set `username` and `password` of your postgres server as per your system
+- now create and load development database
 ```bash
+$ dropdb trivia
 $ createdb trivia
-$ createdb trivia_test
-$ psql trivia < trivia.psql
+$ psql trivia [username] < trivia.psql
 ```
+- to test your APIs, create a test database as well
+```bash
+$ dropdb trivia_test [username]
+$ createdb trivia_test [username]
+$ psql trivia_test [username] < trivia.psql
+$ python test_flaskr.py
+
+```
+
 
 5. Run the development server:
   ```bash 
