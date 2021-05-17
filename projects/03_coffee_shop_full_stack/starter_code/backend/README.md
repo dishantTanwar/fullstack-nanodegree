@@ -1,4 +1,13 @@
 # Coffee Shop Backend
+# Note:
+While running I was getting this error
+>TypeError: required field "type_ignores" 
+
+due to outdated werkeug Module
+after updating it with bellow command it worked fine
+```bash
+pip install --upgrade werkzeug
+```
 
 ## Getting Started
 

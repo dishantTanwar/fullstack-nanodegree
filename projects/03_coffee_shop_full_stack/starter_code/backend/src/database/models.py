@@ -18,6 +18,7 @@ setup_db(app)
 def setup_db(app):
     app.config["SQLALCHEMY_DATABASE_URI"] = database_path
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    # app.app_context()
     db.app = app
     db.init_app(app)
 
@@ -34,13 +35,12 @@ def db_drop_and_create_all():
     db.drop_all()
     db.create_all()
     # add one demo row which is helping in POSTMAN test
-    drink = Drink(
-        title='water',
-        recipe='[{"name": "water", "color": "blue", "parts": 1}]'
-    )
+    drink1 = Drink(title='water',recipe='[{"name": "water", "color": "blue", "parts": 1}]')
+    drink1.insert()
 
-
-drink.insert()
+    drink2 = Drink(title='nescafe',recipe='[{"name": "nescafe", "color": "brown", "parts": 1}]')
+    drink2.insert()
+    
 # ROUTES
 
 '''
@@ -55,7 +55,12 @@ class Drink(db.Model):
     # String Title
     title = Column(String(80), unique=True)
     # the ingredients blob - this stores a lazy json blob
-    # the required datatype is [{'color': string, 'name':string, 'parts':number}]
+    # the required datatype is 
+    # [{
+    #   'color': string,
+    #   'name':string, 
+    #   'parts':number
+    # }]
     recipe = Column(String(180), nullable=False)
 
     '''
@@ -95,8 +100,13 @@ class Drink(db.Model):
     '''
 
     def insert(self):
-        db.session.add(self)
-        db.session.commit()
+        try:
+
+            db.session.add(self)
+            db.session.commit()
+        except:
+            db.session.rollback()
+
 
     '''
     delete()
