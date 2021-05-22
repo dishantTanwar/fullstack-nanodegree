@@ -107,7 +107,7 @@ This section deals with using `endpoints`, thier required `requests` and `respon
 
 ### Base URL
 
-**_https://artist-capstone-fsnd-matthew.herokuapp.com_**
+**_https://**
 
 ### Authentication
 
@@ -152,7 +152,7 @@ Each ressource documentation is clearly structured:
 Get all actors
 
 ```bash
-$ curl -X GET https://artist-capstone-fsnd-matthew.herokuapp.com/actors
+$ curl -X GET https:
 ```
 - Fetches a list of dictionaries of actors
 - Request Headers: **None**
@@ -186,7 +186,7 @@ $ curl -X GET https://artist-capstone-fsnd-matthew.herokuapp.com/actors
 Add new Actor into database.
 
 ```bash
-$ curl -X POST https://artist-capstone-fsnd-matthew.herokuapp.com/actors
+$ curl -X POST https:
 ```
 
 - Request Arguments: **None**
@@ -212,7 +212,7 @@ If you try to create a actor without required value like `name`,
 it will throw a `400` error:
 
 ```bash
-$ curl -X GET https://artist-capstone-fsnd-matthew.herokuapp.com/actors?page123124
+$ curl -X GET https://
 ```
 
 will return
@@ -231,7 +231,7 @@ will return
 Edit details of an existing Actor
 
 ```bash
-$ curl -X PATCH https://artist-capstone-fsnd-matthew.herokuapp.com/actors/1
+$ curl -X PATCH https://
 ```
 
 - Request Arguments: **integer** `id of actor you want to update`
@@ -266,7 +266,7 @@ $ curl -X PATCH https://artist-capstone-fsnd-matthew.herokuapp.com/actors/1
 If you try to update an actor with an invalid id it will throw an `404`error:
 
 ```bash
-$ curl -X PATCH https://artist-capstone-fsnd-matthew.herokuapp.com/actors/125
+$ curl -X PATCH https://
 ```
 
 will return
@@ -294,8 +294,7 @@ Additionally, an `PATCH` request with no body will result in an following error.
 Delete an existing Actor
 
 ```bash
-$ curl -X DELETE https://artist-capstone-fsnd-matthew.herokuapp.com/actors/1
-```
+$ curl -X DELETE https://
 
 - Request Arguments: **integer** `id from actor you want to delete`
 - Request Headers: `None`
@@ -316,7 +315,7 @@ $ curl -X DELETE https://artist-capstone-fsnd-matthew.herokuapp.com/actors/1
 If you try to delete actor with an invalid id, it will throw an `404`error:
 
 ```bash
-$ curl -X DELETE https://artist-capstone-fsnd-matthew.herokuapp.com/actors/125
+$ curl -X DELETE https://
 ```
 
 will return
@@ -335,7 +334,7 @@ will return
 Get all movies
 
 ```bash
-$ curl -X GET https://artist-capstone-fsnd-matthew.herokuapp.com/movies?page1
+$ curl -X GET https://
 ```
 - Fetches a list of dictionaries of movies
 - Request Headers: **None**
@@ -371,7 +370,7 @@ $ curl -X GET https://artist-capstone-fsnd-matthew.herokuapp.com/movies?page1
 Add a new Movie into database.
 
 ```bash
-$ curl -X POST https://artist-capstone-fsnd-matthew.herokuapp.com/movies
+$ curl -X POST https://
 ```
 
 - Request Arguments: **None**
@@ -396,7 +395,7 @@ If you try to create a movie without required value like `title`,
 it will throw a `400` error:
 
 ```bash
-$ curl -X GET https://artist-capstone-fsnd-matthew.herokuapp.com/movies?page123124
+$ curl -X GET https://
 ```
 
 will return
@@ -415,7 +414,7 @@ will return
 Edit an existing Movie
 
 ```bash
-$ curl -X PATCH https://artist-capstone-fsnd-matthew.herokuapp.com/movies/1
+$ curl -X PATCH https://
 ```
 
 - Request Arguments: **integer** `id from movie you want to update`
@@ -452,7 +451,7 @@ $ curl -X PATCH https://artist-capstone-fsnd-matthew.herokuapp.com/movies/1
 If you try to update an movie with an invalid id it will throw an `404`error:
 
 ```bash
-$ curl -X PATCH https://artist-capstone-fsnd-matthew.herokuapp.com/movies/125
+$ curl -X PATCH https://
 ```
 
 will return
@@ -480,7 +479,7 @@ Additionally, an `PATCH` request with no body will result in an following error.
 Delete an existing movie
 
 ```bash
-$ curl -X DELETE https://artist-capstone-fsnd-matthew.herokuapp.com/movies/1
+$ curl -X DELETE https://
 ```
 
 - Request Arguments: **integer** `id from movie you want to delete`
@@ -502,7 +501,7 @@ $ curl -X DELETE https://artist-capstone-fsnd-matthew.herokuapp.com/movies/1
 If you try to delete movie with an invalid id, it will throw an `404`error:
 
 ```bash
-$ curl -X DELETE https://artist-capstone-fsnd-matthew.herokuapp.com/movies/125
+$ curl -X DELETE https://
 ```
 
 will return
